@@ -14,6 +14,9 @@ pulled pork
 hamburger
 cavity
 tape
-label
-peugeot
-citroen
+orientation_rh
+metalic_clip
+bag_ear
+plastic_clip
+met
+oeticker
