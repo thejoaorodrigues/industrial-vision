@@ -1,7 +1,0 @@
-tape
-orientation_rh
-metalic_clip
-bag_ear
-plastic_clip
-oeticker
-b
