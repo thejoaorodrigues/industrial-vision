@@ -1,5 +1,5 @@
 train: C:\Users\Z0142848\Desktop\industrial_vision\yolov5\ASL_Poly_Instance_Seg_25\train\images
 val: C:\Users\Z0142848\Desktop\industrial_vision\yolov5\ASL_Poly_Instance_Seg_25\valid\images
 
-nc: 26
-names: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
+nc: 6
+names: ['bag_ear', 'black_tape', 'metal_clip', 'oeticker_plate', 'plastic_clip', 'side_rh']
