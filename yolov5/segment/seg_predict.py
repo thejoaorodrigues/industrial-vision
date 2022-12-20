@@ -121,7 +121,11 @@ def run(
     model.warmup(imgsz=(1 if pt else bs, 3, *imgsz))  # warmup
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
 
+    ##########################################
     for path, im, im0s, vid_cap, s in dataset:
+        # INITIALIZE LIST TO STORE DISTANCES BETWEEN CENTROIDS
+        distances = []
+
         with dt[0]:
             im = torch.from_numpy(im).to(model.device)
             im = im.half() if model.fp16 else im.float()  # uint8 to fp16/32
@@ -142,8 +146,10 @@ def run(
         # pred = utils.general.apply_classifier(pred, classifier_model, im, im0s)
 
         # Process predictions
+        ##############################
         for i, det in enumerate(pred):  # per image
             seen += 1
+
             if webcam:  # batch_size >= 1
                 p, im0, frame = path[i], im0s[i].copy(), dataset.count
                 s += f'{i}: '
@@ -189,9 +195,20 @@ def run(
                     255 if retina_masks else im[i])
 
                 # Write results
+                # LOOP THROUGH EACH BOUNDING BOXES
+                #############################################################
                 for j, (*xyxy, conf, cls) in enumerate(reversed(det[:, :6])):
+                    iv_centroidX = (det[j][0].item()+det[j][2].item())/2
+                    iv_centroidY = (det[j][1].item()+det[j][3].item())/2
+                    #print(iv_centroidX, iv_centroidY)
+                    org1 = [int(iv_centroidX), int(iv_centroidY)]
+                    distances.append(org1)
+                    print(distances)
+                    cv2.circle(im0, org1, 2, (245,245,245), 2)
+
                     # SHOW FPS
                     cv2.putText(im0, "FPS: " + str(int(fps)), (20, 40), cv2.FONT_HERSHEY_PLAIN, 2, (0,255,0), 3)
+
                     if save_txt:  # Write to file
                         seg = segments[j].reshape(-1)  # (n,2) to (n*2)
                         line = (cls, *seg, conf) if save_conf else (cls, *seg)  # label format
@@ -233,7 +250,7 @@ def run(
                     vid_writer[i].write(im0)
 
         # Print time (inference-only)
-        LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
+        # LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
 
     # Print results
     t = tuple(x.t / seen * 1E3 for x in dt)  # speeds per image
