@@ -1,6 +1,7 @@
 # YOLOv5 🚀 by Ultralytics, GPL-3.0 license
 """
 Run YOLOv5 segmentation inference on images, videos, directories, streams, etc.
+
 Usage - sources:
     $ python segment/predict.py --weights yolov5s-seg.pt --source 0                               # webcam
                                                                   img.jpg                         # image
@@ -12,6 +13,7 @@ Usage - sources:
                                                                   'path/*.jpg'                    # glob
                                                                   'https://youtu.be/Zgi9g1ksQHc'  # YouTube
                                                                   'rtsp://example.com/media.mp4'  # RTSP, RTMP, HTTP stream
+
 Usage - formats:
     $ python segment/predict.py --weights yolov5s-seg.pt                 # PyTorch
                                           yolov5s-seg.torchscript        # TorchScript
@@ -31,6 +33,8 @@ import os
 import platform
 import sys
 from pathlib import Path
+import time
+import cv2
 
 import torch
 
@@ -48,7 +52,6 @@ from utils.general import (LOGGER, Profile, check_file, check_img_size, check_im
 from utils.plots import Annotator, colors, save_one_box
 from utils.segment.general import masks2segments, process_mask, process_mask_native
 from utils.torch_utils import select_device, smart_inference_mode
-
 
 @smart_inference_mode()
 def run(
@@ -100,6 +103,8 @@ def run(
     stride, names, pt = model.stride, model.names, model.pt
     imgsz = check_img_size(imgsz, s=stride)  # check image size
 
+    startTime = 0 # FOR FPS CALCULATION 
+
     # Dataloader
     bs = 1  # batch_size
     if webcam:
@@ -115,6 +120,7 @@ def run(
     # Run inference
     model.warmup(imgsz=(1 if pt else bs, 3, *imgsz))  # warmup
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
+
     for path, im, im0s, vid_cap, s in dataset:
         with dt[0]:
             im = torch.from_numpy(im).to(model.device)
@@ -143,6 +149,11 @@ def run(
                 s += f'{i}: '
             else:
                 p, im0, frame = path, im0s.copy(), getattr(dataset, 'frame', 0)
+
+            #FPS CALCULATION
+            currentTime = time.time()                    
+            fps = 1/(currentTime - startTime)
+            startTime = currentTime
 
             p = Path(p)  # to Path
             save_path = str(save_dir / p.name)  # im.jpg
@@ -179,6 +190,8 @@ def run(
 
                 # Write results
                 for j, (*xyxy, conf, cls) in enumerate(reversed(det[:, :6])):
+                    # SHOW FPS
+                    cv2.putText(im0, "FPS: " + str(int(fps)), (20, 40), cv2.FONT_HERSHEY_PLAIN, 2, (0,255,0), 3)
                     if save_txt:  # Write to file
                         seg = segments[j].reshape(-1)  # (n,2) to (n*2)
                         line = (cls, *seg, conf) if save_conf else (cls, *seg)  # label format
@@ -196,10 +209,6 @@ def run(
             # Stream results
             im0 = annotator.result()
             if view_img:
-                if platform.system() == 'Linux' and p not in windows:
-                    windows.append(p)
-                    cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)  # allow window resize (Linux)
-                    cv2.resizeWindow(str(p), im0.shape[1], im0.shape[0])
                 cv2.imshow(str(p), im0)
                 if cv2.waitKey(1) == ord('q'):  # 1 millisecond
                     exit()

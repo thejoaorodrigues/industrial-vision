@@ -1,6 +1,7 @@
 # YOLOv5 🚀 by Ultralytics, GPL-3.0 license
 """
 Run YOLOv5 segmentation inference on images, videos, directories, streams, etc.
+
 Usage - sources:
     $ python segment/predict.py --weights yolov5s-seg.pt --source 0                               # webcam
                                                                   img.jpg                         # image
@@ -12,6 +13,7 @@ Usage - sources:
                                                                   'path/*.jpg'                    # glob
                                                                   'https://youtu.be/Zgi9g1ksQHc'  # YouTube
                                                                   'rtsp://example.com/media.mp4'  # RTSP, RTMP, HTTP stream
+
 Usage - formats:
     $ python segment/predict.py --weights yolov5s-seg.pt                 # PyTorch
                                           yolov5s-seg.torchscript        # TorchScript
@@ -31,6 +33,8 @@ import os
 import platform
 import sys
 from pathlib import Path
+import time
+import cv2
 
 import torch
 
@@ -132,9 +136,6 @@ def run(
         with dt[2]:
             pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det, nm=32)
 
-        # Second-stage classifier (optional)
-        # pred = utils.general.apply_classifier(pred, classifier_model, im, im0s)
-
         # Process predictions
         for i, det in enumerate(pred):  # per image
             seen += 1
@@ -179,6 +180,7 @@ def run(
 
                 # Write results
                 for j, (*xyxy, conf, cls) in enumerate(reversed(det[:, :6])):
+                    cv2.putText(im0, "FPS: ", (20, 40), cv2.FONT_HERSHEY_PLAIN, 2, (0,255,0), 3)
                     if save_txt:  # Write to file
                         seg = segments[j].reshape(-1)  # (n,2) to (n*2)
                         line = (cls, *seg, conf) if save_conf else (cls, *seg)  # label format
@@ -196,15 +198,12 @@ def run(
             # Stream results
             im0 = annotator.result()
             if view_img:
-                if platform.system() == 'Linux' and p not in windows:
-                    windows.append(p)
-                    cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)  # allow window resize (Linux)
-                    cv2.resizeWindow(str(p), im0.shape[1], im0.shape[0])
                 cv2.imshow(str(p), im0)
                 if cv2.waitKey(1) == ord('q'):  # 1 millisecond
-                    exit()
+                    exit() 
 
             # Save results (image with detections)
+            # SAVES VIDEO ON RUNS/PREDICT-SEG
             if save_img:
                 if dataset.mode == 'image':
                     cv2.imwrite(save_path, im0)
