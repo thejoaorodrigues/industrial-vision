@@ -35,8 +35,11 @@ import sys
 from pathlib import Path
 import time
 import cv2
-
+import math
 import torch
+
+# TAPE DIMENSIONS
+TAPE_LENGTH = 2.5
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[1]  # YOLOv5 root directory
@@ -76,7 +79,7 @@ def run(
     project=ROOT / 'runs/predict-seg',  # save results to project/name
     name='exp',  # save results to project/name
     exist_ok=False,  # existing project/name ok, do not increment
-    line_thickness=3,  # bounding box thickness (pixels)
+    line_thickness=1,  # bounding box thickness (pixels)
     hide_labels=False,  # hide labels
     hide_conf=False,  # hide confidences
     half=False,  # use FP16 half-precision inference
@@ -198,13 +201,24 @@ def run(
                 # LOOP THROUGH EACH BOUNDING BOXES
                 #############################################################
                 for j, (*xyxy, conf, cls) in enumerate(reversed(det[:, :6])):
-                    iv_centroidX = (det[j][0].item()+det[j][2].item())/2
-                    iv_centroidY = (det[j][1].item()+det[j][3].item())/2
-                    #print(iv_centroidX, iv_centroidY)
-                    org1 = [int(iv_centroidX), int(iv_centroidY)]
-                    distances.append(org1)
-                    print(distances)
-                    cv2.circle(im0, org1, 2, (245,245,245), 2)
+                    # Determine which class is being detected
+                    objectClass = det[j][5].item()
+                    # Filter the classes to draw centroids around (tape and oeticker)
+                    if objectClass == 1 or objectClass == 3:
+                        # Calculate lenght of first tape detected 
+                        if objectClass == 1:
+                            tapeLenghtDetected = det[j][2].item() - det[j][0].item()
+
+                        # Calculate coordinates of x and y for centroid construction
+                        iv_centroidX = (det[j][0].item()+det[j][2].item())/2
+                        iv_centroidY = (det[j][1].item()+det[j][3].item())/2
+
+                        # DETERMINE TUPLE WITH XY COORDS
+                        # Construct centroid
+                        org1 = [int(iv_centroidX), int(iv_centroidY)]
+
+                        # Append org1 to the distances list
+                        distances.append(org1)
 
                     # SHOW FPS
                     cv2.putText(im0, "FPS: " + str(int(fps)), (20, 40), cv2.FONT_HERSHEY_PLAIN, 2, (0,255,0), 3)
@@ -222,6 +236,45 @@ def run(
                         # annotator.draw.polygon(segments[j], outline=colors(c, True), width=3)
                     if save_crop:
                         save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
+
+                else:
+                    distances.sort(key=lambda x: x[0])
+
+                    for k in range(len(distances)):
+                        # CHECK CURRENT CENTROID           
+                        iv_centroidX = distances[k][0]
+                        iv_centroidY = distances[k][1]
+                        org1 = (iv_centroidX, iv_centroidY)
+                        cv2.circle(im0, org1, 2, (255,255,255), 2)
+
+                        if k == 0:
+                            pass
+                        else:
+                            # CHECK PREVIOUS CENTROID
+                            iv_centroidXp = distances[k-1][0]
+                            iv_centroidYp = distances[k-1][1]
+
+                            # DETERMINE TUPLE WITH XY COORDS
+                            org1 = [int(iv_centroidX), int(iv_centroidY)]
+                            org2 = [int(iv_centroidXp), int(iv_centroidYp)]
+
+                            dist = math.sqrt((org1[0]-org2[0])**2 + (org1[1]-org2[1])**2)-TAPE_LENGTH
+                            metric = dist * TAPE_LENGTH / tapeLenghtDetected
+                            middlePoint = [int(((org1[0]+org2[0])/2)*0.9), int(((org1[1]+org2[1])/2)*1.1)]
+
+                            #print(middlePoint)
+                            if metric < 10:
+                                # Draw line between centroids
+                                cv2.line(im0, org2, org1, (0,0,255), 4)
+                                
+                                # Write distance between centroids
+                                cv2.putText(im0, str(round(metric, 2)) + 'cm', middlePoint, cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 2)
+                            else:
+                                # Draw line between centroids
+                                cv2.line(im0, org2, org1, (240,240,240), 2)
+                                # Write distance between centroids
+                                cv2.putText(im0, str(round(metric, 2)) + 'cm', middlePoint, cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 2)
+
 
             # Stream results
             im0 = annotator.result()
